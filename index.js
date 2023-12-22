@@ -1,11 +1,13 @@
 const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors())
+app.use(cors({
+  origin: ["https://taskifypro-server.vercel.app", "https://taskswift-cd0f1.firebaseapp.com","http://localhost:5173"],
+}))
 app.use(express.json());
 
 
@@ -46,9 +48,13 @@ app.get("/", (req, res) => {
 
   app.get("/api/v1/tasks", async(req,res)=>{
     try{
-        const page = parseInt(req.query.currentPage);
-    const size = parseInt(req.query.size);
-    const result = await tasksCollection.find().skip(page*size).limit(size).toArray()
+        const email = req.query.email;
+        const status = req.query.status;
+        const query = {creator_email: email}
+        if (status) {
+          query.status = status;
+      }
+    const result = await tasksCollection.find(query).toArray()
     const count = await tasksCollection.estimatedDocumentCount();
     res.send({result, count})
     }
@@ -56,6 +62,35 @@ app.get("/", (req, res) => {
         console.log("error")
     }
   })
+
+  
+  //update a doc
+  app.patch('/api/v1/update/:id',async(req,res)=>{
+    const id = req.params.id;
+    const updatedStatus = req.body;
+    console.log(updatedStatus,id)
+    const query = {_id: new ObjectId(id)};
+    const option = {upsert: true }
+    const updatedDoc = {
+      $set:{
+        status: updatedStatus.status
+      }
+    }
+    const result = await tasksCollection.updateOne(query,updatedDoc,option);
+    res.send(result)
+  })
+
+    //add a task
+    app.post('/api/v1/tasks', async(req,res)=>{
+      try{
+        const data = req.body;
+        const result = await tasksCollection.insertOne(data);
+  res.send(result)
+      }
+      catch{
+        console.log(error)
+      }
+    })
 
   app.listen(port, ()=>{
     console.log("app is running")
